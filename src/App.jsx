@@ -26,16 +26,55 @@ export default function App() {
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedTool, setSelectedTool] = useState('amplitude');
+  const [tools, setTools] = useState([
+    { key: 'amplitude', name: 'Amplitude', icon: '📊' },
+    { key: 'mixpanel', name: 'Mixpanel', icon: '🔥' },
+    { key: 'google_analytics', name: 'Google Analytics', icon: '📈' }
+  ]);
   const [darkMode, setDarkMode] = useState(true);
   const [searchHistory, setSearchHistory] = useState(getHistory());
   const [showHistory, setShowHistory] = useState(false);
-  const [faqQuestions, setFaqQuestions] = useState([
-    'How do I build a funnel?',
-    'What is a cohort?',
-    'How do I track retention?'
-  ]);
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
+
+  const getPlaceholder = () => {
+    switch (selectedTool) {
+      case 'mixpanel': return 'Ask anything about Mixpanel...';
+      case 'google_analytics': return 'Ask anything about Google Analytics...';
+      default: return 'Ask anything about Amplitude...';
+    }
+  };
+
+  const getFooterText = () => {
+    switch (selectedTool) {
+      case 'mixpanel': return 'Built with Mixpanel Docs · Gemini AI · FAISS';
+      case 'google_analytics': return 'Built with Google Analytics Docs · Gemini AI · FAISS';
+      default: return 'Built with Amplitude Docs · Gemini AI · FAISS';
+    }
+  };
+
+  const getDefaultChips = () => {
+    switch (selectedTool) {
+      case 'mixpanel': return [
+        'How do I create a funnel in Mixpanel?',
+        'What is retention in Mixpanel?',
+        'How do I create a cohort in Mixpanel?'
+      ];
+      case 'google_analytics': return [
+        'What is a segment in Google Analytics?',
+        'How do I track conversions in GA4?',
+        'What are events in Google Analytics?'
+      ];
+      default: return [
+        'How do I build a funnel?',
+        'What is a cohort?',
+        'How do I track retention?'
+      ];
+    }
+  };
+
+  const [faqQuestions, setFaqQuestions] = useState(getDefaultChips());
 
   const theme = {
     dark: {
@@ -74,6 +113,16 @@ export default function App() {
           }
         }
       })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setFaqQuestions(getDefaultChips());
+  }, [selectedTool]);
+
+  useEffect(() => {
+    axios.get('http://localhost:8000/tools')
+      .then(res => setTools(res.data.tools))
       .catch(() => {});
   }, []);
 
@@ -424,7 +473,8 @@ export default function App() {
     try {
       const response = await axios.post('http://localhost:8000/ask', {
         query: searchQuery,
-        model: selectedModel
+        model: selectedModel,
+        tool: selectedTool
       });
       const data = response.data;
       clearInterval(interval);
@@ -591,6 +641,35 @@ export default function App() {
             </select>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', color: t.muted }}>Tool:</span>
+            {tools.map(tool => (
+              <button
+                key={tool.key}
+                onClick={() => {
+                  setSelectedTool(tool.key);
+                  setMessages([{
+                    id: Date.now(),
+                    type: 'system',
+                    content: `Switched to ${tool.name} — ask me anything!`
+                  }]);
+                }}
+                style={{
+                  backgroundColor: selectedTool === tool.key ? t.accent : 'transparent',
+                  border: `1px solid ${selectedTool === tool.key ? t.accent : t.border}`,
+                  borderRadius: '20px',
+                  padding: '6px 16px',
+                  fontSize: '13px',
+                  color: selectedTool === tool.key ? 'white' : t.muted,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {tool.icon} {tool.name}
+              </button>
+            ))}
+          </div>
+
         </div>
 
         {/* Tab Switcher */}
@@ -653,7 +732,11 @@ export default function App() {
               width: '100%',
             }}>
               {messages.map((msg) => (
-                msg.type === 'user' ? (
+                msg.type === 'system' ? (
+                  <div key={msg.id} style={{ textAlign: 'center', color: t.muted, fontSize: '13px', padding: '8px' }}>
+                    {msg.content}
+                  </div>
+                ) : msg.type === 'user' ? (
                   <div key={msg.id} style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <div style={{
                       backgroundColor: t.accent,
@@ -749,7 +832,7 @@ export default function App() {
                   ref={inputRef}
                   type="text"
                   style={styles.input}
-                  placeholder="Ask anything about Amplitude..."
+                  placeholder={getPlaceholder()}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   onFocus={() => setShowHistory(true)}
@@ -879,7 +962,7 @@ export default function App() {
 
         {/* Footer */}
         <div style={styles.footer}>
-          <p style={{ marginBottom: '8px' }}>Built with Amplitude Docs · Gemini AI · FAISS</p>
+          <p style={{ marginBottom: '8px' }}>{getFooterText()}</p>
           <p>Developed by <span style={{ color: t.accent }}>Chinmayi</span></p>
         </div>
       </div>
