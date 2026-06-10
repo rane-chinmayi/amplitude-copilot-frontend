@@ -1,21 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-const HISTORY_KEY = 'amplitude_search_history';
+const getHistoryKey = (tool) => `amplitude_search_history_${tool}`;
 
-const getHistory = () => {
+const getHistory = (tool) => {
   try {
-    return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
+    return JSON.parse(localStorage.getItem(getHistoryKey(tool))) || [];
   } catch { return []; }
 };
 
-const saveToHistory = (query) => {
-  const history = getHistory();
+const saveToHistory = (query, tool) => {
+  const history = getHistory(tool);
   const updated = [query, ...history.filter(q => q !== query)].slice(0, 10);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  localStorage.setItem(getHistoryKey(tool), JSON.stringify(updated));
 };
 
 export default function App() {
@@ -33,7 +34,7 @@ export default function App() {
     { key: 'google_analytics', name: 'Google Analytics', icon: '📈' }
   ]);
   const [darkMode, setDarkMode] = useState(true);
-  const [searchHistory, setSearchHistory] = useState(getHistory());
+  const [searchHistory, setSearchHistory] = useState(getHistory(selectedTool));
   const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -118,6 +119,7 @@ export default function App() {
 
   useEffect(() => {
     setFaqQuestions(getDefaultChips());
+    setSearchHistory(getHistory(selectedTool));
   }, [selectedTool]);
 
   useEffect(() => {
@@ -129,6 +131,22 @@ export default function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Cmd+K or Ctrl+K to focus search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+      // Escape to clear chat
+      if (e.key === 'Escape') {
+        inputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const styles = {
     app: {
@@ -465,8 +483,8 @@ export default function App() {
 
     setMessages(prev => [...prev, userMsg, loadingMsg]);
     setQuery('');
-    saveToHistory(searchQuery);
-    setSearchHistory(getHistory());
+    saveToHistory(searchQuery, selectedTool);
+    setSearchHistory(getHistory(selectedTool));
 
     const interval = startLoadingAnimation();
 
@@ -609,10 +627,10 @@ export default function App() {
         {/* Header */}
         <div style={styles.header}>
           <div style={styles.emoji}>{activeTab === 'assistant' ? '🤖' : '📊'}</div>
-          <h1 style={styles.title}>{activeTab === 'assistant' ? 'Amplitude AI Assistant' : 'Analytics Dashboard'}</h1>
+          <h1 style={styles.title}>{activeTab === 'assistant' ? 'DocPilot' : 'Analytics Dashboard'}</h1>
           <p style={styles.subtitle}>
             {activeTab === 'assistant'
-              ? 'Get instant answers from Amplitude documentation'
+              ? 'Get instant answers from your analytics tool docs'
               : 'View usage metrics and query analytics'}
           </p>
           <div style={styles.badge}>✦ Powered by Gemini AI + FAISS</div>
@@ -641,34 +659,36 @@ export default function App() {
             </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '13px', color: t.muted }}>Tool:</span>
-            {tools.map(tool => (
-              <button
-                key={tool.key}
-                onClick={() => {
-                  setSelectedTool(tool.key);
-                  setMessages([{
-                    id: Date.now(),
-                    type: 'system',
-                    content: `Switched to ${tool.name} — ask me anything!`
-                  }]);
-                }}
-                style={{
-                  backgroundColor: selectedTool === tool.key ? t.accent : 'transparent',
-                  border: `1px solid ${selectedTool === tool.key ? t.accent : t.border}`,
-                  borderRadius: '20px',
-                  padding: '6px 16px',
-                  fontSize: '13px',
-                  color: selectedTool === tool.key ? 'white' : t.muted,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {tool.icon} {tool.name}
-              </button>
-            ))}
-          </div>
+          {activeTab === 'assistant' && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13px', color: t.muted }}>Tool:</span>
+              {tools.map(tool => (
+                <button
+                  key={tool.key}
+                  onClick={() => {
+                    setSelectedTool(tool.key);
+                    setMessages([{
+                      id: Date.now(),
+                      type: 'system',
+                      content: `Switched to ${tool.name} — ask me anything!`
+                    }]);
+                  }}
+                  style={{
+                    backgroundColor: selectedTool === tool.key ? t.accent : 'transparent',
+                    border: `1px solid ${selectedTool === tool.key ? t.accent : t.border}`,
+                    borderRadius: '20px',
+                    padding: '6px 16px',
+                    fontSize: '13px',
+                    color: selectedTool === tool.key ? 'white' : t.muted,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {tool.icon} {tool.name}
+                </button>
+              ))}
+            </div>
+          )}
 
         </div>
 
@@ -853,6 +873,33 @@ export default function App() {
                 </button>
               </div>
 
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                marginTop: '6px',
+                marginBottom: '8px'
+              }}>
+                <span style={{
+                  fontSize: '11px',
+                  color: t.muted,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  Press
+                  <kbd style={{
+                    backgroundColor: t.card,
+                    border: `1px solid ${t.border}`,
+                    borderRadius: '4px',
+                    padding: '1px 6px',
+                    fontSize: '11px',
+                    color: t.muted,
+                    fontFamily: 'monospace'
+                  }}>Ctrl+K</kbd>
+                  to focus
+                </span>
+              </div>
+
               {/* Search History Dropdown */}
               {showHistory && searchHistory.length > 0 && (
                 <div style={{
@@ -899,6 +946,10 @@ export default function App() {
               {analyticsLoading ? '⏳ Loading...' : '🔄 Refresh Data'}
             </button>
 
+            <p style={{ fontSize: '13px', color: t.muted, marginBottom: '24px' }}>
+              📊 Showing combined metrics across Amplitude, Mixpanel and Google Analytics
+            </p>
+
             {/* Metrics Grid */}
             {analytics && (
               <>
@@ -920,6 +971,85 @@ export default function App() {
                     <div style={styles.metricLabel}>Deflection Rate</div>
                   </div>
                 </div>
+
+                {/* Daily Query Trend */}
+                {analytics.daily_trend && analytics.daily_trend.length > 0 && (
+                  <div style={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                    <h3 style={{ color: t.text, fontSize: '16px', marginBottom: '16px' }}>📈 Daily Query Trend</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <LineChart data={analytics.daily_trend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={t.border} />
+                        <XAxis dataKey="date" stroke={t.muted} fontSize={11} />
+                        <YAxis stroke={t.muted} fontSize={11} />
+                        <Tooltip contentStyle={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '8px', color: t.text }} />
+                        <Line type="monotone" dataKey="queries" stroke="#7C3AED" strokeWidth={2} dot={{ fill: '#7C3AED' }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Queries by Tool */}
+                {analytics.tool_breakdown && analytics.tool_breakdown.length > 0 && (
+                  <div style={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                    <h3 style={{ color: t.text, fontSize: '16px', marginBottom: '16px' }}>🔧 Queries by Tool</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={analytics.tool_breakdown}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={t.border} />
+                        <XAxis dataKey="tool" stroke={t.muted} fontSize={11} />
+                        <YAxis stroke={t.muted} fontSize={11} />
+                        <Tooltip contentStyle={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '8px', color: t.text }} />
+                        <Bar dataKey="queries" fill="#7C3AED" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Top Questions */}
+                {analytics.top_questions && analytics.top_questions.length > 0 && (
+                  <div style={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                    <h3 style={{ color: t.text, fontSize: '16px', marginBottom: '16px' }}>❓ Top Questions</h3>
+                    {analytics.top_questions?.map((q, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${t.border}` }}>
+                        <span style={{ color: t.text, fontSize: '14px', flex: 1, marginRight: '16px' }}>{q.question}</span>
+                        <span style={{ color: t.accent, fontSize: '13px', fontWeight: '600', backgroundColor: t.bg, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '2px 10px' }}>{q.count}x</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Deflection Rate by Tool */}
+                {analytics.tool_deflection && analytics.tool_deflection.length > 0 && (
+                  <div style={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                    <h3 style={{ color: t.text, fontSize: '16px', marginBottom: '16px' }}>🎯 Deflection Rate by Tool</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={analytics.tool_deflection}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={t.border} />
+                        <XAxis dataKey="tool" stroke={t.muted} fontSize={11} />
+                        <YAxis stroke={t.muted} fontSize={11} unit="%" />
+                        <Tooltip contentStyle={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '8px', color: t.text }} formatter={(value) => [`${value}%`, 'Deflection Rate']} />
+                        <Bar dataKey="rate" fill="#10B981" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+
+                {/* Response Confidence */}
+                {analytics.confidence_breakdown && analytics.confidence_breakdown.length > 0 && (
+                  <div style={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+                    <h3 style={{ color: t.text, fontSize: '16px', marginBottom: '16px' }}>🎯 Response Confidence</h3>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie data={analytics.confidence_breakdown} dataKey="count" nameKey="level" cx="50%" cy="50%" outerRadius={80} label={({ level, count }) => `${level}: ${count}`}>
+                          {analytics.confidence_breakdown?.map((entry, i) => (
+                            <Cell key={i} fill={entry.level === 'High' ? '#10B981' : entry.level === 'Medium' ? '#EAB308' : '#EF4444'} />
+                          ))}
+                        </Pie>
+                        <Tooltip contentStyle={{ backgroundColor: t.card, border: `1px solid ${t.border}`, borderRadius: '8px', color: t.text }} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
 
                 {/* Recent Queries Table */}
                 <h3 style={{ color: t.text, marginBottom: '16px', fontSize: '16px' }}>Recent Queries (Last 10)</h3>
