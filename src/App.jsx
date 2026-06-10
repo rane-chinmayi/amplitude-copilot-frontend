@@ -3,7 +3,7 @@ import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'https://docpilot-api-v061.onrender.com';
 
 const getHistoryKey = (tool) => `amplitude_search_history_${tool}`;
 
@@ -102,7 +102,7 @@ export default function App() {
   }, [darkMode]);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/analytics')
+    axios.get('https://docpilot-api-v061.onrender.com/analytics')
       .then(res => {
         if (res.data.recent && res.data.recent.length >= 3) {
           const topQueries = res.data.recent
@@ -123,7 +123,7 @@ export default function App() {
   }, [selectedTool]);
 
   useEffect(() => {
-    axios.get('http://localhost:8000/tools')
+    axios.get('https://docpilot-api-v061.onrender.com/tools')
       .then(res => setTools(res.data.tools))
       .catch(() => {});
   }, []);
@@ -489,7 +489,7 @@ export default function App() {
     const interval = startLoadingAnimation();
 
     try {
-      const response = await axios.post('http://localhost:8000/ask', {
+      const response = await axios.post('https://docpilot-api-v061.onrender.com/ask', {
         query: searchQuery,
         model: selectedModel,
         tool: selectedTool
@@ -512,7 +512,7 @@ export default function App() {
 
       // Fetch related questions
       try {
-        const relatedRes = await axios.post('http://localhost:8000/related', {
+        const relatedRes = await axios.post('https://docpilot-api-v061.onrender.com/related', {
           query: searchQuery,
           answer: data.answer,
           model: selectedModel
@@ -540,7 +540,7 @@ export default function App() {
     if (msg) {
       const idx = messages.indexOf(msg);
       const userMsg = messages.slice(0, idx).reverse().find(m => m.type === 'user');
-      axios.post('http://localhost:8000/feedback', {
+      axios.post('https://docpilot-api-v061.onrender.com/feedback', {
         query: userMsg?.content || '',
         answer: msg.content,
         feedback: type
@@ -565,7 +565,7 @@ export default function App() {
   const fetchAnalytics = async () => {
     setAnalyticsLoading(true);
     try {
-      const response = await axios.get('http://localhost:8000/analytics');
+      const response = await axios.get('https://docpilot-api-v061.onrender.com/analytics');
       setAnalytics(response.data);
     } catch (error) {
       console.error('Analytics fetch error:', error);
